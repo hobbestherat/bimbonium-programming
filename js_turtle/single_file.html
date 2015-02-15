@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Bimbonium Programming</title>
+    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
+    <script>
+var _pos = [0, 0];
+var _oldPos = [0, 0];
+var _direction = 0.0;
+var canvas;
+var overlay;
+var context
+var _penDown = true;
+var _color = "black";
+var _w, _h;
+var _commands;
+var _animationStepNumber;
+var _startTime;
+var _totalTime = 0;
+var _animation = true;
+var _turnDelay = 10;
+var _stepDelay = 10;
+
+function hasStoredData(id) {
+	if (!document.getElementById(id)) {
+		return false;
+	}
+	return (document.getElementById(id).innerHTML.trim() != "");
+}
+
+function getStoredData(id) {
+	if (!document.getElementById(id)) {
+		return "";
+	}
+	return decodeURI(document.getElementById(id).innerHTML);
+}
+
+function setStoredData(id, data) {
+	if (!document.getElementById(id)) {
+		// create the data element
+		var dataStore = document.getElementById("dataStore")
+		if (dataStore) {
+			var dataDiv = document.createElement("div");
+			dataDiv.id = id;
+			dataStore.appendChild(dataDiv);
+		}
+	}
+	document.getElementById(id).innerHTML = encodeURI(data);
+}
+
+function animationStep(timestamp) {
+  if (!_startTime) {
+  	_startTime = timestamp;
+  }
+	if (_animationStepNumber >= _commands.length) {
+		 drawRobotAtCurrentPos();  
+		return;
+	}
+  var progress = timestamp - _startTime;
+
+  var step = _commands[_animationStepNumber];
+  while (step.progressEnd < progress) {
+  	finalizeStep(step);
+    _animationStepNumber++;
+    if (_animationStepNumber < _commands.length) {
+    	step = _commands[_animationStepNumber];
+    } else {
+      drawRobotAtCurrentPos();  
+    	return;
+    }
+  }
+
+  // now we are in the current animation step.
+  overlayContext.clearRect(0, 0, _w, _h);
+
+  var stepProgress = 1.0;
+  var duration = (step.progressEnd - step.progressStart);
+  if (duration > 0) {
+  	stepProgress = (progress - step.progressStart) / duration;
+  }
+  if (step.op == "rotate") {
+  	var a = step.start_direction + (step.end_direction - step.start_direction) * stepProgress;
+  	drawRobot(step.from, a);
+  } 
+  if (step.op == "step") {
+  	var p = [step.from[0] + (step.to[0] - step.from[0]) * stepProgress,
+  	     step.from[1] + (step.to[1] - step.from[1]) * stepProgress];
+  	if (step.down) {
+	  	overlayContext.beginPath();
+	  	overlayContext.strokeStyle = step.color;
+			overlayContext.moveTo(_w / 2 + step.from[0], _h / 2 - step.from[1]);
+			overlayContext.lineTo(_w / 2 + p[0], _h / 2 - p[1]);
+			overlayContext.stroke();
+		}
+  	drawRobot(p, step.start_direction);	
+  }
+  if (step.op == "wait") {
+  	drawRobot(step.from, step.start_direction);	
+  }
+
+	if (_animationStepNumber < _commands.length) {
+		window.requestAnimationFrame(animationStep);
+  } else {
+  	drawRobotAtCurrentPos();  
+  }
+}
+
+function startAnimation() {
+	window.requestAnimationFrame(animationStep);
+}
+
+function finalizeStep(step) {
+	if (step.op == "step") {
+		if (step.down) {
+	 		context.beginPath();
+	 		context.strokeStyle = step.color;
+			context.moveTo(_w / 2 + step.from[0], _h / 2 - step.from[1]);
+			context.lineTo(_w / 2 + step.to[0], _h / 2 - step.to[1]);
+			context.stroke();
+	  }
+	}
+}
+
+// stepDelay ms/step of stepsize, turnDelay ms/degree 
+function init(aCanvas, aOverlay, animation, stepDelay, turnDelay) {
+	if (typeof animation !== 'undefined') {
+		_animation = animation;
+	} else {
+		_animation = true;
+	}
+	_stepDelay = stepDelay || 10;
+	_turnDelay = turnDelay || 10;
+
+	canvas = aCanvas;
+	overlay = aOverlay;
+	_pos = [0, 0];
+	_oldPos = [0, 0];
+	_direction = 0.0;
+	_commands = new Array();
+	_animationStepNumber = 0;
+	_startTime = null;
+	_totalTime = 0.0;
+	_penDown = true;
+
+  _w = canvas.clientWidth;
+  _h = canvas.clientHeight;
+	context = canvas.getContext('2d');
+	context.clearRect(0, 0, _w, _h);
+	overlayContext = overlay.getContext('2d');
+
+	// now we are in the current animation step.
+  drawRobotAtCurrentPos();  
+}
+
+function drawRobotAtCurrentPos() {
+	overlayContext.clearRect(0, 0, _w, _h);
+  drawRobot(_pos, _direction); 
+}
+
+function registerAnimationStep(data, duration) {
+	data.progressStart = _totalTime;
+	data.progressEnd = _totalTime + duration;
+	_totalTime += duration;
+	_commands.push(data);	
+}
+
+function drawRobot(p, dir) {
+  overlayContext.beginPath();
+  overlayContext.arc(_w / 2 + p[0], _h / 2 - p[1], 10, 0, 2 * Math.PI, false);
+  overlayContext.fillStyle = '#880000';
+  overlayContext.fill();
+ 
+  overlayContext.beginPath();
+  overlayContext.fillStyle = "#00FF00";
+  overlayContext.arc(_w / 2 + p[0] + Math.cos(dir) * 5 + Math.cos(dir + Math.PI / 2) * 5, 
+  	  _h / 2 - p[1] - Math.sin(dir) * 5 - Math.sin(dir + Math.PI / 2) * 5, 2, 0, 2 * Math.PI, false);
+    overlayContext.arc(_w / 2 + p[0] + Math.cos(dir) * 5 + Math.cos(dir - Math.PI / 2) * 5, 
+  	  _h / 2 - p[1] - Math.sin(dir) * 5 - Math.sin(dir - Math.PI / 2) * 5, 2, 0, 2 * Math.PI, false);
+   overlayContext.fill();
+}
+
+// commands that can be used in the bimbo-script
+function step(number) {
+	var STEP_SIZE = 30;
+	number = number || 1;
+	var from = [_pos[0], _pos[1]];
+	_pos[0] += Math.cos(_direction) * number * STEP_SIZE;
+	_pos[1] += Math.sin(_direction) * number * STEP_SIZE;
+	var to = [_pos[0], _pos[1]];
+	var thisStep = {op : "step", dist : number, from : from, to : to, down : _penDown, 
+		  color : _color,
+		  start_direction : _direction, end_direction : _direction};
+	if (_animation) {
+		registerAnimationStep(thisStep, Math.abs(_stepDelay * number * STEP_SIZE));
+	} else {
+		finalizeStep(thisStep);
+	}
+}
+
+function left(degrees) {
+	degrees = degrees || 90.0;
+	var from = [_pos[0], _pos[1]];
+	var thisStep = {op : "rotate", from : from, to : from, start_direction : _direction, 
+		  end_direction : _direction + degrees / 180 * Math.PI, angle : degrees};
+  if (_animation) {
+	  registerAnimationStep(thisStep, Math.abs(_turnDelay * degrees));
+  } else {
+		finalizeStep(thisStep);
+	}
+	_direction += degrees / 180 * Math.PI;
+}
+
+function right(degrees) {
+	degrees = degrees || 90.0;
+	left(-degrees);
+}
+
+function up() {
+	_penDown = false;
+}
+
+function down() {
+	_penDown = true;
+}
+
+function wait(ms) {
+	var p = [_pos[0], _pos[1]];
+	var thisStep = {op : "wait", from : p, to : p, start_direction : _direction, 
+		  end_direction : _direction};
+	registerAnimationStep(thisStep, ms);
+}
+
+function color(col) {
+	_color = col;
+}
+
+schritt = step;
+Schritt = step;
+SCHRITT = step;
+Step = step;
+STEP = step;
+links = left;
+Links = left;
+LINKS = left;
+Left = left;
+LEFT = left;
+rechts = right;
+Rechts = right;
+RECHTS = right;
+Right = right;
+RIGHT = right;
+
+
+    </script>
+  </head>
+  <style>
+.button {
+	margin: .5em auto;
+	outline: none;
+	cursor: pointer;
+	text-align: center;
+	text-decoration: none;
+	font: 14px/100% Arial, Helvetica, sans-serif;
+	padding: .5em 2em .55em;
+
+	vertical-align: middle;
+	text-shadow: 0 1px 1px rgba(0,0,0,.4);
+	-webkit-border-radius: .2em;
+	-moz-border-radius: .2em;
+	border-radius: .2em;
+	-webkit-box-shadow: 2px 2px 2px rgba(0,0,0,.2);
+	-moz-box-shadow: 	2px 2px 2px rgba(0,0,0,.2);
+	box-shadow: 2px 2px 2px rgba(0,0,0,.2);
+}
+.button:hover {
+	text-decoration: none;
+}
+.button:active {
+	position: relative;
+	top: 1px;
+}
+.bigbutton {
+	padding: 1em 4em 1.1em;
+}
+.green {
+  color: #ffffff;
+	border: solid 1px #538312;
+	background: #6bdd28;
+	background: -webkit-gradient(linear, left top, left bottom, from(#6bdd28), to(#439b0c));
+	background: -moz-linear-gradient(top,  #6bdd28,  #439b0c);
+	filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#6bdd28', endColorstr='#439b0c');
+}
+.green:hover {
+	background: #8bed38;
+	background: -webkit-gradient(linear, left top, left bottom, from(#8bed38), to(#63ab1c));
+	background: -moz-linear-gradient(top,  #8bed38,  #63ab1c);
+	filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#8bed38', endColorstr='#63ab1c');
+}
+.green:active {
+	background: #8bed38;
+	background: -webkit-gradient(linear, left top, left bottom, from(#63ab1c), to(#8bed38));
+	background: -moz-linear-gradient(top,  #63ab1c,  #8bed38);
+	filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#63ab1c', endColorstr='#8bed38');
+}
+.oops {
+		font: 16px/100% Arial, Helvetica, sans-serif;
+		color:red;
+}
+</style>
+
+<div id="dataStore" style="display:none">
+	<div id="programData">schritt(5);%0Alinks(120);%0A%0Aschritt(5);%0Alinks(120);%0A%0Aschritt(5);%0A</div>
+</div>
+
+<button class="button green" onClick="run();">Run</button>
+<div id="oops" class="oops" style="display:none;">
+Oje, dis Programm het a Fähler. Oops, your program has a problem. 你的软件有问题。
+</div>
+<div style="height:520px;">
+<textarea id="program" style="width:300px; height:500px;float:left;margin-right:20px" 
+  onchange="setStoredData('programData', document.getElementById('program').value);updateUrl();">
+</textarea>
+<div>
+<canvas id="canvas" height="500px" width="500px" style="border:solid black 1px; position:absolute; float:left;">
+</canvas>
+<canvas id="canvasOverlay" height="500px" width="500px" style="border:solid black 1px; position:absolute;float:left;">
+</canvas>
+</div>
+</div>
+
+<input type="checkbox" id="animationCheckBox" checked="true" 
+    onchange="setStoredData('animationData', ''+ document.getElementById('animationCheckBox').checked);updateUrl();">Animate
+<input type="number" id="stepDelay" min="0" max="20" value="10" 
+    onchange="setStoredData('stepDelayData', document.getElementById('stepDelay').value);updateUrl();">(ms) Step delay
+<input type="number" id="rotationDelay" min="0" max="20" value="10"
+    onchange="setStoredData('rotationDelayData', document.getElementById('rotationDelay').value);updateUrl();">(ms) Rotation delay
+
+<div>
+This is a single file version that can be stored locally (and will store the code and settings together with the page).<br/>
+The basic keywords may be entered in English or German all captial letters, all lower case or with the first character capitalized.
+<ul>
+  <li>left(); links(); left(30); LINKS(45); // by default 90 degrees, other angles can be provided</li>
+  <li>right(); rechts(); right(30); RECHTS(45);</li>
+  <li>step(); schritt(); step(4); Schritt(4);</li>
+</ul>
+Advanced (only in English and lowercase):
+<ul>
+  <li>up(); // lift the pen up</li>
+  <li>down(); // put the pen down</li>
+  <li>color("red"); color("#00ff00");</li>
+  <li>wait(1000); // milliseconds </li>
+  <li>All other javascript functions ;-)</li>
+</ul>
+<br/>
+<br/>
+<div id="url"></div>
+<br/>
+Contact: <a href="mailto:thomas.frey@gmail.com">Thomas M. Frey</a>
+</div>
+
+<script type="text/javascript">
+  function encodeForURI(data) {
+  	return encodeURIComponent(data).replace(/{/g, "%7B")
+  	  .replace(/}/g, "%7D").replace(/</g, "%3C").replace(/>/g, "%3E")
+  	  .replace(/'/g, "%27");
+  }
+  function decodeFromURI(data) {
+  	return decodeURIComponent(data); //.replace(/%3C/g, "<").replace(/%3E/g, ">").replace(/%27/g, "'");
+  }  
+  function updateUrl() {
+  	var s = window.location.href.split('?')[0] + "?program=" + encodeForURI(document.getElementById('program').value);
+  	if (!document.getElementById("animationCheckBox").checked) {
+  		s += "&animation=false";
+  	}
+  	s += "&stepDelay=" + document.getElementById("stepDelay").value;
+  	s += "&rotationDelay=" + document.getElementById("rotationDelay").value;
+  	document.getElementById('url').innerHTML = 
+  	    "<a target='_blank' href='" + s + "'>" + "Open in new Window" + "</a> "
+  	    + "<input type='text' onClick='this.select();' value='" + s + "'>";
+  }
+  function parseParameter() {
+   	var query = window.location.search.substring(1);
+
+   	console.log(query);
+    var vars = query.split("&");
+    for (var i = 0; i < vars.length; i++) {
+    	str = vars[i];
+      var index = str.indexOf("=");  // Gets the first index where a space occours
+      if (index < 0) {
+      	continue;
+      }
+			var key = str.substr(0, index); // Gets the first part
+			var value = str.substr(index + 1);
+
+      console.log(key + " : " + value);
+    	if (key == "program") {
+    		document.getElementById('program').value = decodeFromURI(value);
+    	} else if (key == "animation") {
+    		document.getElementById("animationCheckBox").checked = value == 'true'
+    	} else if (key == "stepDelay") {
+    		document.getElementById("stepDelay").value = value;
+    	} else if (key == "rotationDelay") {
+    		document.getElementById("rotationDelay").value = value;
+    	}
+    }
+  }
+
+	// restore data from dom
+	if (hasStoredData('programData')) {
+		document.getElementById('program').value = getStoredData('programData');
+	}
+	if (hasStoredData('animationData')) {
+		document.getElementById("animationCheckBox").checked = getStoredData('animationData') == 'true';
+	}
+	if (hasStoredData('stepDelayData')) {
+		document.getElementById("stepDelay").value = getStoredData('stepDelayData');
+	}
+	if (hasStoredData('rotationDelayData')) {
+		document.getElementById("rotationDelay").value = getStoredData('rotationDelayData');
+	}
+
+  // override program and paramters from url.
+	parseParameter();
+	updateUrl();
+
+	// initialize the screen
+	init(document.getElementById('canvas'), document.getElementById('canvasOverlay'));
+
+	function run() {
+		init(document.getElementById('canvas'), document.getElementById('canvasOverlay'), 
+			document.getElementById("animationCheckBox").checked, 
+			document.getElementById("stepDelay").value,
+			document.getElementById("rotationDelay").value);
+		codeError = null;
+		document.getElementById('oops').style.display = "none";
+		eval("try {" + document.getElementById('program').value + "} catch(ex1) { codeError = ex1; }");
+		if (codeError != null) {
+			document.getElementById('oops').style.display = "block";
+			console.log(codeError);
+		}
+		startAnimation();
+	}
+</script>
+
+</html>

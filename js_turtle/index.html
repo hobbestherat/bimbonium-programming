@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Bimbonium Programming JS-Turtle</title>
+    <meta http-equiv='Content-Type' content='text/html; charset=UTF-8'/>
+    <script src="commands.js"> </script>
+  </head>
+  <style>
+.button {
+	margin: .5em auto;
+	outline: none;
+	cursor: pointer;
+	text-align: center;
+	text-decoration: none;
+	font: 14px/100% Arial, Helvetica, sans-serif;
+	padding: .5em 2em .55em;
+
+	vertical-align: middle;
+	text-shadow: 0 1px 1px rgba(0,0,0,.4);
+	-webkit-border-radius: .2em;
+	-moz-border-radius: .2em;
+	border-radius: .2em;
+	-webkit-box-shadow: 2px 2px 2px rgba(0,0,0,.2);
+	-moz-box-shadow: 	2px 2px 2px rgba(0,0,0,.2);
+	box-shadow: 2px 2px 2px rgba(0,0,0,.2);
+}
+.button:hover {
+	text-decoration: none;
+}
+.button:active {
+	position: relative;
+	top: 1px;
+}
+.bigbutton {
+	padding: 1em 4em 1.1em;
+}
+.green {
+  color: #ffffff;
+	border: solid 1px #538312;
+	background: #6bdd28;
+	background: -webkit-gradient(linear, left top, left bottom, from(#6bdd28), to(#439b0c));
+	background: -moz-linear-gradient(top,  #6bdd28,  #439b0c);
+	filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#6bdd28', endColorstr='#439b0c');
+}
+.green:hover {
+	background: #8bed38;
+	background: -webkit-gradient(linear, left top, left bottom, from(#8bed38), to(#63ab1c));
+	background: -moz-linear-gradient(top,  #8bed38,  #63ab1c);
+	filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#8bed38', endColorstr='#63ab1c');
+}
+.green:active {
+	background: #8bed38;
+	background: -webkit-gradient(linear, left top, left bottom, from(#63ab1c), to(#8bed38));
+	background: -moz-linear-gradient(top,  #63ab1c,  #8bed38);
+	filter:  progid:DXImageTransform.Microsoft.gradient(startColorstr='#63ab1c', endColorstr='#8bed38');
+}
+.oops {
+		font: 16px/100% Arial, Helvetica, sans-serif;
+		color:red;
+}
+</style>
+
+<div id="dataStore" style="display:none">
+	<div id="programData">schritt(5);%0Alinks(120);%0A%0Aschritt(5);%0Alinks(120);%0A%0Aschritt(5);%0A</div>
+</div>
+
+<button class="button green" onClick="run();">Run</button>
+<div id="oops" class="oops" style="display:none;">
+Oje, dis Programm het a Fähler. Oops, your program has a problem. 你的软件有问题。
+</div>
+<div style="height:520px;">
+<textarea id="program" style="width:300px; height:500px;float:left;margin-right:20px" 
+  onchange="setStoredData('programData', document.getElementById('program').value);updateUrl();">
+</textarea>
+<div>
+<canvas id="canvas" height="500px" width="500px" style="border:solid black 1px; position:absolute; float:left;">
+</canvas>
+<canvas id="canvasOverlay" height="500px" width="500px" style="border:solid black 1px; position:absolute;float:left;">
+</canvas>
+</div>
+</div>
+
+<input type="checkbox" id="animationCheckBox" checked="true" 
+    onchange="setStoredData('animationData', ''+ document.getElementById('animationCheckBox').checked);updateUrl();">Animate
+<input type="number" id="stepDelay" min="0" max="20" value="10" 
+    onchange="setStoredData('stepDelayData', document.getElementById('stepDelay').value);updateUrl();">(ms) Step delay
+<input type="number" id="rotationDelay" min="0" max="20" value="10"
+    onchange="setStoredData('rotationDelayData', document.getElementById('rotationDelay').value);updateUrl();">(ms) Rotation delay
+
+<div>
+<br/>
+<div id="url"></div>
+<br/>
+The keywords may be entered in English or German all captial letters, all lower case or with the first character capitalized.
+<ul>
+  <li>left(); links(); left(30); LINKS(45);</li>
+  <li>right(); rechts(); right(30); RECHTS(45);</li>
+  <li>step(); schritt(); step(4); Schritt(4);</li>
+</ul>
+Advanced (only in one language and capitalization):
+<ul>
+  <li>up(); // lift the pen up</li>
+  <li>down(); // put the pen down</li>
+  <li>color("red"); color("#00ff00");</li>
+  <li>wait(1000); // milliseconds </li>
+  <li>All other javascript functions ;-)</li>
+</ul>
+<br/>
+Contact: <a href="mailto:thomas.frey@gmail.com">Thomas M. Frey</a>
+
+</div>
+
+<script type="text/javascript">
+  function encodeForURI(data) {
+  	return encodeURIComponent(data).replace(/{/g, "%7B")
+  	  .replace(/}/g, "%7D").replace(/</g, "%3C").replace(/>/g, "%3E")
+  	  .replace(/'/g, "%27");
+  }
+  function decodeFromURI(data) {
+  	return decodeURIComponent(data);//.replace(/%3C/g, "<").replace(/%3E/g, ">").replace(/%27/g, "'");
+  }  
+  function updateUrl() {
+  	var s = window.location.href.split('?')[0] + "?program=" + encodeForURI(document.getElementById('program').value);
+  	if (!document.getElementById("animationCheckBox").checked) {
+  		s += "&animation=false";
+  	}
+  	s += "&stepDelay=" + document.getElementById("stepDelay").value;
+  	s += "&rotationDelay=" + document.getElementById("rotationDelay").value;
+  	document.getElementById('url').innerHTML = 
+  	    "<a target='_blank' href='" + s + "'>" + "Open in new Window" + "</a> "
+  	    + "<input type='text' onClick='this.select();' value='" + s + "'>";
+  }
+  function parseParameter() {
+   	var query = window.location.search.substring(1);
+
+   	console.log(query);
+    var vars = query.split("&");
+    for (var i = 0; i < vars.length; i++) {
+    	str = vars[i];
+      var index = str.indexOf("=");  // Gets the first index where a space occours
+      if (index < 0) {
+      	continue;
+      }
+			var key = str.substr(0, index); // Gets the first part
+			var value = str.substr(index + 1);
+
+      console.log(key + " : " + value);
+    	if (key == "program") {
+    		document.getElementById('program').value = decodeFromURI(value);
+    	} else if (key == "animation") {
+    		document.getElementById("animationCheckBox").checked = value == 'true'
+    	} else if (key == "stepDelay") {
+    		document.getElementById("stepDelay").value = value;
+    	} else if (key == "rotationDelay") {
+    		document.getElementById("rotationDelay").value = value;
+    	}
+    }
+  }
+
+	// restore data from dom
+	if (hasStoredData('programData')) {
+		document.getElementById('program').value = getStoredData('programData');
+	}
+
+	if (hasStoredData('animationData')) {
+		document.getElementById("animationCheckBox").checked = getStoredData('animationData') == 'true';
+	}
+	if (hasStoredData('stepDelayData')) {
+		document.getElementById("stepDelay").value = getStoredData('stepDelayData');
+	}
+	if (hasStoredData('rotationDelayData')) {
+		document.getElementById("rotationDelay").value = getStoredData('rotationDelayData');
+	}
+
+  // override program and paramters from url.
+	parseParameter();
+	updateUrl();
+	// initialize the screen
+	init(document.getElementById('canvas'), document.getElementById('canvasOverlay'));
+
+	function run() {
+		init(document.getElementById('canvas'), document.getElementById('canvasOverlay'), 
+			document.getElementById("animationCheckBox").checked, 
+			document.getElementById("stepDelay").value,
+			document.getElementById("rotationDelay").value);
+		codeError = null;
+		document.getElementById('oops').style.display = "none";
+		eval("try {" + document.getElementById('program').value + "} catch(ex1) { codeError = ex1; }");
+		if (codeError != null) {
+			document.getElementById('oops').style.display = "block";
+			console.log(codeError);
+		}
+		startAnimation();
+	}
+</script>
+
+</html>
